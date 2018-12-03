@@ -1,35 +1,43 @@
 #![allow(dead_code)]
 
-use std::iter::Peekable;
+use std::{iter::Peekable, result::Result as StdResult};
 
 fn is_symbol(ch: char) -> bool {
     match ch {
-        '(' | ')' | '{' | '}' => true,
-        '/' | '*' | '+' | '-' => true,
+        '(' | ')' | '\\' | '.' => true,
+
+        _ => false,
+    }
+}
+
+fn is_ident(ch: char) -> bool {
+    match ch {
+        'a'...'z' | 'A'...'Z' | '_' => true,
 
         _ => false,
     }
 }
 
 #[derive(Debug, PartialEq)]
-enum Value {
-    Integer(i64),
-    String(String),
+enum LexerError {
+    InvalidSymbol(char),
+    UnknownToken,
 }
+
+type Result<T> = StdResult<T, LexerError>;
 
 #[derive(Debug, PartialEq)]
 enum Token {
-    Value(Value),
+    // Data
+    Ident(String),
 
+    // Delimiters
     LParen,
     RParen,
-    LBracket,
-    RBracket,
 
-    Divide,
-    Multiply,
-    Plus,
-    Subtract,
+    // Symbols
+    BSlash,
+    Dot,
 }
 
 struct Tokenizer<I: Iterator<Item = char>> {
@@ -37,50 +45,36 @@ struct Tokenizer<I: Iterator<Item = char>> {
 }
 
 impl<I: Iterator<Item = char>> Tokenizer<I> {
-    fn next(&mut self) -> Option<Token> {
-        let ch = match self.peek() {
-            Some(ch) => ch,
-            None => return None,
-        };
+    fn next(&mut self) -> Result<Option<Token>> {
+        while let Some(ch) = self.peek() {
+            if is_symbol(ch) {
+                self.chars.next();
 
-        if is_symbol(ch) {
-            match self.chars.next() {
-                Some('/') => return Some(Token::Divide),
-                Some('*') => return Some(Token::Multiply),
-                Some('+') => return Some(Token::Plus),
-                Some('-') => return Some(Token::Subtract),
-                Some('(') => return Some(Token::LParen),
-                Some(')') => return Some(Token::RParen),
-                Some('{') => return Some(Token::LBracket),
-                Some('}') => return Some(Token::RBracket),
+                return match ch {
+                    '(' => Ok(Some(Token::LParen)),
+                    ')' => Ok(Some(Token::RParen)),
+                    '\\' => Ok(Some(Token::BSlash)),
+                    '.' => Ok(Some(Token::Dot)),
 
-                _ => (),
-            }
-        }
-
-        if ch == '\'' {
-            self.chars.next();
-            let string = self.read_while(|ch| ch != '\'');
-            return Some(Token::Value(Value::String(string)));
-        }
-
-        let string = self.read_while(|ch| !ch.is_whitespace() && ch != '\n');
-        match ch {
-            '0'...'9' => {
-                if let Ok(num) = string.parse::<i64>() {
-                    return Some(Token::Value(Value::Integer(num)));
-                }
-
-                return None;
+                    _ => Err(LexerError::InvalidSymbol(ch)),
+                };
             }
 
-            _ => None,
-        }
-    }
+            if is_ident(ch) {
+                let ident = self.read_while(|ch| is_ident(ch));
 
-    fn peek(&mut self) -> Option<char> {
-        self.trim();
-        self.chars.peek().cloned()
+                return Ok(Some(Token::Ident(ident)));
+            }
+
+            if ch.is_whitespace() {
+                self.chars.next();
+                continue;
+            }
+
+            return Err(LexerError::UnknownToken);
+        }
+
+        Ok(None)
     }
 
     fn read_while<F>(&mut self, mut proceed: F) -> String
@@ -88,8 +82,9 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
         F: FnMut(char) -> bool,
     {
         let mut string = String::new();
-        while let Some(ch) = self.chars.next() {
+        while let Some(ch) = self.peek() {
             if proceed(ch) {
+                self.chars.next();
                 string.push(ch)
             } else {
                 return string;
@@ -99,30 +94,22 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
         return string;
     }
 
-    fn trim(&mut self) {
-        loop {
-            match self.chars.peek().cloned() {
-                Some(ch) if ch.is_whitespace() => {
-                    self.chars.next();
-                }
-
-                _ => break,
-            }
-        }
+    fn peek(&mut self) -> Option<char> {
+        self.chars.peek().cloned()
     }
 }
 
-fn tokenizer(input: &str) -> Vec<Token> {
+fn tokenizer(input: &str) -> Result<Vec<Token>> {
     let mut tokenizer = Tokenizer {
         chars: input.chars().peekable(),
     };
 
     let mut tokens = Vec::new();
-    while let Some(token) = tokenizer.next() {
+    while let Some(token) = tokenizer.next()? {
         tokens.push(token)
     }
 
-    tokens
+    Ok(tokens)
 }
 
 #[cfg(test)]
@@ -130,87 +117,79 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hello_world_string() {
+    fn identity() {
         assert_eq!(
-            tokenizer("'hello, world!'"),
-            &[Token::Value(Value::String("hello, world!".to_string()))]
+            tokenizer("foo").unwrap(),
+            &[Token::Ident("foo".to_string())]
         )
     }
 
     #[test]
-    fn multiple_line_string() {
+    fn identities() {
         assert_eq!(
-            tokenizer(
-                "'multiple
-            lines!'"
-            ),
-            &[Token::Value(Value::String(
-                "multiple
-            lines!"
-                    .to_string()
-            ))]
-        )
-    }
-
-    #[test]
-    fn single_digit() {
-        assert_eq!(tokenizer("1"), &[Token::Value(Value::Integer(1))])
-    }
-
-    #[test]
-    fn multiple_digits() {
-        assert_eq!(tokenizer("123"), &[Token::Value(Value::Integer(123))])
-    }
-
-    #[test]
-    fn multiple_values() {
-        assert_eq!(
-            tokenizer("'hello' 123 '!'"),
+            tokenizer("foo bar baz").unwrap(),
             &[
-                Token::Value(Value::String("hello".to_string())),
-                Token::Value(Value::Integer(123)),
-                Token::Value(Value::String("!".to_string()))
+                Token::Ident("foo".to_string()),
+                Token::Ident("bar".to_string()),
+                Token::Ident("baz".to_string())
             ]
         )
     }
 
     #[test]
-    fn delimiters() {
+    fn symbols() {
         assert_eq!(
-            tokenizer("((){{}})"),
+            tokenizer(r"( ( . \ ( \ ) . ) )").unwrap(),
             &[
                 Token::LParen,
                 Token::LParen,
+                Token::Dot,
+                Token::BSlash,
+                Token::LParen,
+                Token::BSlash,
                 Token::RParen,
-                Token::LBracket,
-                Token::LBracket,
-                Token::RBracket,
-                Token::RBracket,
+                Token::Dot,
+                Token::RParen,
                 Token::RParen
             ]
         )
     }
 
     #[test]
-    fn arithmetic_symbols() {
+    fn program_1() {
         assert_eq!(
-            tokenizer("/ * + -"),
-            &[Token::Divide, Token::Multiply, Token::Plus, Token::Subtract]
+            tokenizer(r"\ x . x").unwrap(),
+            &[
+                Token::BSlash,
+                Token::Ident("x".to_string()),
+                Token::Dot,
+                Token::Ident("x".to_string())
+            ]
         )
     }
 
     #[test]
-    fn simple_arithmetic_expression() {
+    fn program_2() {
         assert_eq!(
-            tokenizer("1 + 2 * 3 - 4"),
+            tokenizer(r"(\ foo . \ y . foo y) (\ bar . bar) w").unwrap(),
             &[
-                Token::Value(Value::Integer(1)),
-                Token::Plus,
-                Token::Value(Value::Integer(2)),
-                Token::Multiply,
-                Token::Value(Value::Integer(3)),
-                Token::Subtract,
-                Token::Value(Value::Integer(4))
+                Token::LParen,
+                Token::BSlash,
+                Token::Ident("foo".to_string()),
+                Token::Dot,
+                Token::BSlash,
+                Token::Ident("y".to_string()),
+                Token::Dot,
+                Token::Ident("foo".to_string()),
+                Token::Ident("y".to_string()),
+                Token::RParen,
+                Token::LParen,
+                Token::BSlash,
+                Token::Ident("bar".to_string()),
+                Token::Dot,
+                Token::Ident("bar".to_string()),
+                Token::RParen,
+                Token::Ident("w".to_string()),
             ]
         )
     }
