@@ -84,18 +84,14 @@ impl<'input> Iterator for Tokenizer<'input> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((i, ch)) = self.chars.next() {
             return Some(match ch {
-                ch if is_symbol(ch) => {
-                    self.chars.next();
+                ch if is_symbol(ch) => match ch {
+                    '(' => Ok(Token::LeftParen),
+                    ')' => Ok(Token::RightParen),
+                    '\\' => Ok(Token::BackSlash),
+                    '.' => Ok(Token::Dot),
 
-                    match ch {
-                        '(' => Ok(Token::LeftParen),
-                        ')' => Ok(Token::LeftParen),
-                        '\\' => Ok(Token::LeftParen),
-                        '.' => Ok(Token::LeftParen),
-
-                        _ => Err(LexerError::UnexpectedCharacter(ch)),
-                    }
-                }
+                    _ => Err(LexerError::UnexpectedCharacter(ch)),
+                },
                 ch if is_ident(ch) => {
                     let ident = self.read_while(i, |ch| is_ident(ch));
                     Ok(Token::Identifier(ident))
@@ -161,42 +157,42 @@ mod tests {
         )
     }
 
-    // #[test]
-    // fn program_1() {
-    //     assert_eq!(
-    //         tokenizer(r"\ x . x").unwrap(),
-    //         &[
-    //             Token::BackSlash,
-    //             Token::Identifier("x".to_string()),
-    //             Token::Dot,
-    //             Token::Identifier("x".to_string())
-    //         ]
-    //     )
-    // }
+    #[test]
+    fn program_1() {
+        assert_eq!(
+            tokenize(r"\ x . x"),
+            &[
+                Ok(Token::BackSlash),
+                Ok(Token::Identifier("x")),
+                Ok(Token::Dot),
+                Ok(Token::Identifier("x"))
+            ]
+        )
+    }
 
-    // #[test]
-    // fn program_2() {
-    //     assert_eq!(
-    //         tokenizer(r"(\ foo . \ y . foo y) (\ bar . bar) w").unwrap(),
-    //         &[
-    //             Token::LeftParen,
-    //             Token::BackSlash,
-    //             Token::Identifier("foo".to_string()),
-    //             Token::Dot,
-    //             Token::BackSlash,
-    //             Token::Identifier("y".to_string()),
-    //             Token::Dot,
-    //             Token::Identifier("foo".to_string()),
-    //             Token::Identifier("y".to_string()),
-    //             Token::RightParen,
-    //             Token::LeftParen,
-    //             Token::BackSlash,
-    //             Token::Identifier("bar".to_string()),
-    //             Token::Dot,
-    //             Token::Identifier("bar".to_string()),
-    //             Token::RightParen,
-    //             Token::Identifier("w".to_string()),
-    //         ]
-    //     )
-    // }
+    #[test]
+    fn program_2() {
+        assert_eq!(
+            tokenize(r"(\ foo . \ y . foo y) (\ bar . bar) w"),
+            &[
+                Ok(Token::LeftParen),
+                Ok(Token::BackSlash),
+                Ok(Token::Identifier("foo")),
+                Ok(Token::Dot),
+                Ok(Token::BackSlash),
+                Ok(Token::Identifier("y")),
+                Ok(Token::Dot),
+                Ok(Token::Identifier("foo")),
+                Ok(Token::Identifier("y")),
+                Ok(Token::RightParen),
+                Ok(Token::LeftParen),
+                Ok(Token::BackSlash),
+                Ok(Token::Identifier("bar")),
+                Ok(Token::Dot),
+                Ok(Token::Identifier("bar")),
+                Ok(Token::RightParen),
+                Ok(Token::Identifier("w"))
+            ]
+        )
+    }
 }
