@@ -2,18 +2,9 @@
 
 use std::{fmt, iter::Peekable, result::Result as StdResult, str::CharIndices};
 
-fn is_symbol(ch: char) -> bool {
-    match ch {
-        '(' | ')' | '\\' | '.' => true,
-
-        _ => false,
-    }
-}
-
-fn is_ident(ch: char) -> bool {
+fn is_identity(ch: char) -> bool {
     match ch {
         'a'...'z' | 'A'...'Z' | '_' => true,
-
         _ => false,
     }
 }
@@ -28,7 +19,7 @@ type Result<T, E> = StdResult<T, E>;
 #[derive(Debug, PartialEq)]
 pub enum Token<'input> {
     // Data
-    Identifier(&'input str),
+    Identity(&'input str),
 
     // Symbols
     BackSlash,
@@ -40,7 +31,7 @@ pub enum Token<'input> {
 impl<'input> fmt::Display for Token<'input> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::Identifier(ident) => write!(f, "{}", ident),
+            Token::Identity(ident) => write!(f, "{}", ident),
             Token::BackSlash => write!(f, "\\"),
             Token::Dot => write!(f, "."),
             Token::LeftParen => write!(f, "("),
@@ -84,20 +75,15 @@ impl<'input> Iterator for Tokenizer<'input> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((i, ch)) = self.chars.next() {
             return Some(match ch {
-                ch if is_symbol(ch) => match ch {
-                    '(' => Ok(Token::LeftParen),
-                    ')' => Ok(Token::RightParen),
-                    '\\' => Ok(Token::BackSlash),
-                    '.' => Ok(Token::Dot),
-
-                    _ => Err(LexerError::UnexpectedCharacter(ch)),
-                },
-                ch if is_ident(ch) => {
-                    let ident = self.read_while(i, |ch| is_ident(ch));
-                    Ok(Token::Identifier(ident))
+                '(' => Ok(Token::LeftParen),
+                ')' => Ok(Token::RightParen),
+                '\\' => Ok(Token::BackSlash),
+                '.' => Ok(Token::Dot),
+                ch if is_identity(ch) => {
+                    let identity = self.read_while(i, |ch| is_identity(ch));
+                    Ok(Token::Identity(identity))
                 }
                 ch if ch.is_whitespace() => continue,
-
                 _ => Err(LexerError::UnexpectedCharacter(ch)),
             });
         }
@@ -122,18 +108,13 @@ mod tests {
     }
 
     #[test]
-    fn identity() {
-        assert_eq!(tokenize("foo"), &[Ok(Token::Identifier("foo"))])
-    }
-
-    #[test]
     fn identities() {
         assert_eq!(
             tokenize("foo bar baz"),
             &[
-                Ok(Token::Identifier("foo")),
-                Ok(Token::Identifier("bar")),
-                Ok(Token::Identifier("baz"))
+                Ok(Token::Identity("foo")),
+                Ok(Token::Identity("bar")),
+                Ok(Token::Identity("baz"))
             ]
         )
     }
@@ -158,40 +139,27 @@ mod tests {
     }
 
     #[test]
-    fn program_1() {
-        assert_eq!(
-            tokenize(r"\ x . x"),
-            &[
-                Ok(Token::BackSlash),
-                Ok(Token::Identifier("x")),
-                Ok(Token::Dot),
-                Ok(Token::Identifier("x"))
-            ]
-        )
-    }
-
-    #[test]
-    fn program_2() {
+    fn program() {
         assert_eq!(
             tokenize(r"(\ foo . \ y . foo y) (\ bar . bar) w"),
             &[
                 Ok(Token::LeftParen),
                 Ok(Token::BackSlash),
-                Ok(Token::Identifier("foo")),
+                Ok(Token::Identity("foo")),
                 Ok(Token::Dot),
                 Ok(Token::BackSlash),
-                Ok(Token::Identifier("y")),
+                Ok(Token::Identity("y")),
                 Ok(Token::Dot),
-                Ok(Token::Identifier("foo")),
-                Ok(Token::Identifier("y")),
+                Ok(Token::Identity("foo")),
+                Ok(Token::Identity("y")),
                 Ok(Token::RightParen),
                 Ok(Token::LeftParen),
                 Ok(Token::BackSlash),
-                Ok(Token::Identifier("bar")),
+                Ok(Token::Identity("bar")),
                 Ok(Token::Dot),
-                Ok(Token::Identifier("bar")),
+                Ok(Token::Identity("bar")),
                 Ok(Token::RightParen),
-                Ok(Token::Identifier("w"))
+                Ok(Token::Identity("w"))
             ]
         )
     }
