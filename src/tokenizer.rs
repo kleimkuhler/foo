@@ -4,7 +4,7 @@ use std::{fmt, iter::Peekable, result::Result as StdResult, str::CharIndices};
 
 fn is_identity(ch: char) -> bool {
     match ch {
-        'a'...'z' | 'A'...'Z' | '_' => true,
+        'a'..='z' | 'A'..='Z' | '_' => true,
         _ => false,
     }
 }
@@ -29,7 +29,7 @@ pub enum Token<'input> {
 }
 
 impl<'input> fmt::Display for Token<'input> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Token::Identity(ident) => write!(f, "{}", ident),
             Token::BackSlash => write!(f, "\\"),
@@ -96,15 +96,8 @@ impl<'input> Iterator for Tokenizer<'input> {
 mod tests {
     use super::*;
 
-    fn tokenize(input: &str) -> Vec<Result<Token, LexerError>> {
-        let mut tokenizer = Tokenizer::new(input);
-        let mut tokens = Vec::new();
-
-        while let Some(token) = tokenizer.next() {
-            tokens.push(token)
-        }
-
-        tokens
+    fn tokenize(input: &str) -> Vec<Result<Token<'_>, LexerError>> {
+        Tokenizer::new(input).collect()
     }
 
     #[test]
