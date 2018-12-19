@@ -8,14 +8,14 @@ fn is_delimiter(c: char) -> bool {
 }
 
 #[derive(Debug, PartialEq)]
-enum LexerError {
+pub enum LexerError {
     InvalidString(String),
 }
 
 type Result<T, E> = StdResult<T, E>;
 
 #[derive(Debug, PartialEq)]
-enum Token<'input> {
+pub enum Token<'input> {
     // Data
     Identifier(&'input str),
     StringLiteral(&'input str),
@@ -29,14 +29,14 @@ enum Token<'input> {
     RParen,
 }
 
-struct Tokenizer<'input> {
+pub struct Tokenizer<'input> {
     input: &'input str,
     chars: Peekable<CharIndices<'input>>,
 }
 
 impl<'input> Tokenizer<'input> {
     #[allow(dead_code)]
-    fn new(input: &'input str) -> Self {
+    pub fn new(input: &'input str) -> Self {
         Tokenizer {
             input,
             chars: input.char_indices().peekable(),
