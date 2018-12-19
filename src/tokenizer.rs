@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{iter::Peekable, result::Result as StdResult, str::CharIndices};
 
 fn is_delimiter(c: char) -> bool {
@@ -11,16 +9,15 @@ fn is_delimiter(c: char) -> bool {
 
 #[derive(Debug, PartialEq)]
 enum LexerError {
-    NonTerminatedString(String),
+    InvalidString(String),
 }
 
 type Result<T, E> = StdResult<T, E>;
 
 #[derive(Debug, PartialEq)]
-pub enum Token<'input> {
+enum Token<'input> {
     // Data
     Identifier(&'input str),
-    Literal(&'input str),
     StringLiteral(&'input str),
 
     // Symbols
@@ -38,6 +35,7 @@ struct Tokenizer<'input> {
 }
 
 impl<'input> Tokenizer<'input> {
+    #[allow(dead_code)]
     fn new(input: &'input str) -> Self {
         Tokenizer {
             input,
@@ -60,18 +58,9 @@ impl<'input> Tokenizer<'input> {
         &self.input[start..self.input.len()]
     }
 
-    fn contiguous_slice(&mut self, start: usize) -> &'input str {
-        self.read_while(start, |c| !is_delimiter(c) && !c.is_whitespace())
-    }
-
     fn consume_identifier(&mut self, start: usize) -> Result<Token<'input>, LexerError> {
-        let identifier = self.contiguous_slice(start);
-        Ok(Token::Identifier(identifier))
-    }
-
-    fn consume_literal(&mut self, start: usize) -> Result<Token<'input>, LexerError> {
-        let literal = self.contiguous_slice(start);
-        Ok(Token::Literal(literal))
+        let word = self.read_while(start, |c| !is_delimiter(c) && !c.is_whitespace());
+        Ok(Token::Identifier(word))
     }
 
     fn consume_string(&mut self, start: usize) -> Result<Token<'input>, LexerError> {
@@ -84,12 +73,12 @@ impl<'input> Tokenizer<'input> {
                         self.chars.next();
                         Ok(Token::StringLiteral(slice))
                     }
-                    _ => Err(LexerError::NonTerminatedString(slice.to_string())),
+                    _ => Err(LexerError::InvalidString(slice.to_string())),
                 };
             }
         }
 
-        Err(LexerError::NonTerminatedString(slice.to_string()))
+        Err(LexerError::InvalidString(slice.to_string()))
     }
 
     fn consume_line_comment(&mut self, start: usize) {
@@ -111,8 +100,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                 '(' => Ok(Token::LParen),
                 ')' => Ok(Token::RParen),
 
-                // Data
-                '\'' => self.consume_literal(i),
+                // Literals
                 '"' => self.consume_string(i),
 
                 // Trivia
@@ -150,19 +138,27 @@ mod tests {
     #[test]
     fn valid() {
         assert_eq!(
-            tokenize(r#"(list"Hi"name(+ 1 2))"#),
+            tokenize(r#"(list"Hi"name(+1-2 3))-!"#),
             &[
                 Ok(Token::LParen),
                 Ok(Token::Identifier("list")),
                 Ok(Token::StringLiteral("Hi")),
                 Ok(Token::Identifier("name")),
                 Ok(Token::LParen),
-                Ok(Token::Identifier("+")),
-                Ok(Token::Identifier("1")),
-                Ok(Token::Identifier("2")),
+                Ok(Token::Identifier("+1-2")),
+                Ok(Token::Identifier("3")),
                 Ok(Token::RParen),
-                Ok(Token::RParen)
+                Ok(Token::RParen),
+                Ok(Token::Identifier("-!"))
             ]
+        )
+    }
+
+    #[test]
+    fn invalid() {
+        assert_eq!(
+            tokenize("\"Hi! \n"),
+            &[Err(LexerError::InvalidString("Hi! ".to_string()))]
         )
     }
 }
