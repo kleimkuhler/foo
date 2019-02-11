@@ -1,7 +1,7 @@
 extern crate syntax;
 
-use syntax::tokenizer::{LexerError, Token, Tokenizer};
 use std::io::{self, Error};
+use syntax::tokenizer::{LexerError, Token, Tokenizer};
 
 fn main() -> Result<(), Error> {
     loop {

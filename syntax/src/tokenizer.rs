@@ -35,7 +35,6 @@ pub struct Tokenizer<'input> {
 }
 
 impl<'input> Tokenizer<'input> {
-    #[allow(dead_code)]
     pub fn new(input: &'input str) -> Self {
         Tokenizer {
             input,
