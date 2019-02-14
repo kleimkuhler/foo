@@ -7,12 +7,12 @@ fn is_delimiter(c: char) -> bool {
     }
 }
 
+type Result<T, E> = StdResult<T, E>;
+
 #[derive(Debug, PartialEq)]
 pub enum LexerError {
     InvalidString(String),
 }
-
-type Result<T, E> = StdResult<T, E>;
 
 #[derive(Debug, PartialEq)]
 pub enum Token<'input> {
@@ -117,13 +117,13 @@ impl<'input> Iterator for Tokenizer<'input> {
     }
 }
 
+pub fn tokenize(input: &str) -> Vec<Result<Token<'_>, LexerError>> {
+    Tokenizer::new(input).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn tokenize(input: &str) -> Vec<Result<Token<'_>, LexerError>> {
-        Tokenizer::new(input).collect()
-    }
 
     #[test]
     fn trivia() {
